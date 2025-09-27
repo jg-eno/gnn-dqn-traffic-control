@@ -1,0 +1,6 @@
+streamlit
+plotly
+flask
+flask-socketio
+pillow
+numpy
