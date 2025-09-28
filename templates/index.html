@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🚦 Visual Traffic Light Simulator</title>
+    <title>🚦 Visual Traffic Light Simulator - NYC Real-Time Data</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 </head>
@@ -11,8 +11,26 @@
     <div class="container">
         <header>
             <h1>🚦 Visual Traffic Light Simulator</h1>
-            <p>Real-time simulation of 4 traffic light intersections with special vehicle priority</p>
+            <p>Real-time simulation of 4 traffic light intersections with special vehicle priority, powered by authentic NYC traffic data</p>
         </header>
+
+        <!-- NYC Real-Time Data Information -->
+        <div class="data-info-banner">
+            <div class="data-info-content">
+                <div class="data-info-icon">🗽</div>
+                <div class="data-info-text">
+                    <h3>Powered by NYC's Actual Real-Time Traffic Data</h3>
+                    <p>This simulation uses authentic traffic flow data from New York City intersections, providing realistic traffic patterns and density variations that reflect real-world conditions.</p>
+                    <div class="data-info-details">
+                        <span class="data-detail">📊 <strong>Data Source:</strong> NYC Traffic Flow Dataset (V-128.csv)</span>
+                        <span class="data-detail">📍 <strong>Coverage:</strong> 128 intersections across NYC</span>
+                        <span class="data-detail">⏱️ <strong>Duration:</strong> 35+ minutes of real traffic data</span>
+                        <span class="data-detail">🔄 <strong>Update Rate:</strong> 1-second intervals</span>
+                        <span class="data-detail">🎯 <strong>Selection:</strong> 4 random intersections for simulation</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div class="controls">
             <button id="startBtn" class="btn btn-start">▶️ Start</button>
@@ -43,6 +61,49 @@
                 <!-- Active Intersection Controller -->
                 <div class="active-controller" id="active-controller">
                     <!-- Controller content will be dynamically loaded here -->
+                </div>
+                
+                <!-- NYC Traffic Data Panel -->
+                <div class="traffic-data-panel" id="traffic-data-panel">
+                    <h3>🗽 NYC Real-Time Traffic Data</h3>
+                    <div class="traffic-data-content">
+                        <div class="data-status" id="data-status">
+                            <span class="status-indicator" id="status-indicator">🔄</span>
+                            <span id="data-status-text">Loading...</span>
+                        </div>
+                        <div class="data-metrics" id="data-metrics" style="display: none;">
+                            <div class="metric-row">
+                                <span class="metric-label">Data Time:</span>
+                                <span class="metric-value" id="data-time">0.0 min</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Progress:</span>
+                                <span class="metric-value" id="data-progress">0.0%</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Avg Flow:</span>
+                                <span class="metric-value" id="avg-flow">0</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Peak Flow:</span>
+                                <span class="metric-value" id="peak-flow">0</span>
+                            </div>
+                        </div>
+                        <div class="data-source-info">
+                            <div class="source-detail">
+                                <span class="source-icon">📊</span>
+                                <span class="source-text">Authentic NYC intersection data</span>
+                            </div>
+                            <div class="source-detail">
+                                <span class="source-icon">🔄</span>
+                                <span class="source-text">Real-time vehicle spawn rates</span>
+                            </div>
+                            <div class="source-detail">
+                                <span class="source-icon">🎯</span>
+                                <span class="source-text">Dynamic traffic patterns</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

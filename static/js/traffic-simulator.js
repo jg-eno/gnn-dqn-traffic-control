@@ -136,6 +136,42 @@ class VisualTrafficSimulator {
             this.updateSimulation(data);
         });
         
+        // Listen for signal control responses
+        this.socket.on('override_set', (data) => {
+            console.log('Signal override set:', data);
+            if (data.success) {
+                this.updateSignalDisplay(data.intersection_id, data.direction, data.signal);
+            }
+        });
+        
+        this.socket.on('auto_mode_set', (data) => {
+            console.log('Auto mode set:', data);
+            if (data.success) {
+                this.updateSignalMode(data.intersection_id, data.direction, 'AUTO');
+            }
+        });
+        
+        this.socket.on('emergency_override_set', (data) => {
+            console.log('Emergency override set:', data);
+            if (data.success) {
+                this.updateSignalDisplay(data.intersection_id, data.direction, 'green');
+                this.updateSignalMode(data.intersection_id, data.direction, 'EMERGENCY');
+            }
+        });
+        
+        this.socket.on('ai_control_set', (data) => {
+            console.log('AI control set:', data);
+            if (data.success) {
+                this.updateSignalDisplay(data.intersection_id, data.direction, data.signal);
+                this.updateSignalMode(data.intersection_id, data.direction, 'AI');
+            }
+        });
+        
+        this.socket.on('error', (data) => {
+            console.error('WebSocket error:', data.message);
+            // You could show a user-friendly error message here
+        });
+        
         this.socket.on('disconnect', () => {
             console.log('Disconnected from server');
         });
@@ -238,6 +274,46 @@ class VisualTrafficSimulator {
         
         // Update vehicles based on intersection data
         this.updateVehicles();
+        
+        // Update traffic data panel
+        this.updateTrafficDataPanel();
+    }
+    
+    updateTrafficDataPanel() {
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('data-status-text');
+        const dataMetrics = document.getElementById('data-metrics');
+        
+        if (!statusIndicator || !statusText || !dataMetrics) return;
+        
+        // Check if traffic data is available
+        if (this.metrics.traffic_data && this.metrics.traffic_data.using_real_data) {
+            const trafficData = this.metrics.traffic_data;
+            
+            // Update status
+            statusIndicator.textContent = '✅';
+            statusText.textContent = 'NYC Traffic Data Active';
+            
+            // Show metrics
+            dataMetrics.style.display = 'flex';
+            
+            // Update metric values
+            const dataTime = document.getElementById('data-time');
+            const dataProgress = document.getElementById('data-progress');
+            const avgFlow = document.getElementById('avg-flow');
+            const peakFlow = document.getElementById('peak-flow');
+            
+            if (dataTime) dataTime.textContent = `${trafficData.current_time_minutes.toFixed(1)} min`;
+            if (dataProgress) dataProgress.textContent = `${trafficData.progress_percentage.toFixed(1)}%`;
+            if (avgFlow) avgFlow.textContent = Math.round(trafficData.average_flow);
+            if (peakFlow) peakFlow.textContent = Math.round(trafficData.peak_flow);
+            
+        } else {
+            // No real traffic data
+            statusIndicator.textContent = '⚠️';
+            statusText.textContent = 'Using Synthetic Data';
+            dataMetrics.style.display = 'none';
+        }
     }
     
     setupIntersectionToggles() {
@@ -419,11 +495,28 @@ class VisualTrafficSimulator {
         modeIndicator.className = 'override-mode';
         
         // Send manual override command to backend
-        this.socket.emit('manual_override', { 
+        this.socket.emit('set_signal_override', { 
             intersection_id: intersectionId, 
             direction: direction,
             signal: signal 
         });
+    }
+    
+    updateSignalDisplay(intersectionId, direction, signal) {
+        // Update the visual signal display
+        const signalElement = document.querySelector(`#signal-${intersectionId}-${direction}`);
+        if (signalElement) {
+            signalElement.className = `signal-indicator ${signal}`;
+        }
+    }
+    
+    updateSignalMode(intersectionId, direction, mode) {
+        // Update the mode indicator
+        const modeIndicator = document.querySelector(`#mode-${intersectionId}-${direction}`);
+        if (modeIndicator) {
+            modeIndicator.textContent = mode;
+            modeIndicator.className = mode === 'AUTO' ? 'auto-mode' : 'override-mode';
+        }
     }
     
     calculateAverageSpeed(intersection) {

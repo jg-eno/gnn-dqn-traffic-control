@@ -1,19 +1,16 @@
-# 🚦 Visual Traffic Light Simulator
+# 🗽 NYC Traffic Light Simulator
 
-A modern web-based traffic light simulation system with **visual roads, animated traffic lights, and moving vehicles**. Features real-time simulation of 4 intersections with special vehicle priority override.
+A **real-time traffic light simulation system** powered by **actual NYC traffic data**. Features 4 intersections with authentic traffic patterns, visual simulation, and intelligent traffic management.
 
-## 🌟 Features
+## 🌟 Key Features
 
+- **🗽 Real NYC Data**: Uses actual traffic flow data from 128 NYC intersections
 - **🎨 Visual Simulation**: HTML5 Canvas with roads, traffic lights, and animated vehicles
-- **🚦 Traffic Lights**: Red, yellow, green lights for each direction (North, South, East, West)
-- **🚗 Custom Vehicle Images**: Real car and ambulance sprites with proper rotation
-- **🛣️ Custom Road Graphics**: Realistic road textures with transparent backgrounds
-- **📱 Fully Responsive**: Scales perfectly on desktop, tablet, and mobile devices
-- **🚨 Special Vehicle Priority**: Emergency vehicles get immediate green lights
-- **📊 Real-time Metrics**: Live performance monitoring and statistics
-- **🌐 Web-based**: Runs in any modern browser with high DPI support
+- **🚦 Smart Traffic Lights**: 4-phase cycle with special vehicle priority override
+- **📊 Real-time Metrics**: Live performance monitoring and traffic data visualization
+- **🌐 Web-based Interface**: Modern dark-themed UI with responsive design
 - **⚡ Real-time Updates**: WebSocket communication for live simulation
-- **🔄 Auto-scaling**: Canvas automatically adjusts to window size
+- **🎛️ Manual Controls**: Individual signal controllers for each intersection
 
 ## 🚀 Quick Start
 
@@ -23,57 +20,165 @@ A modern web-based traffic light simulation system with **visual roads, animated
 
 ### Installation
 ```bash
-# Clone or download the project
+# Clone the repository
 cd gnn-dqn-traffic-control
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the visual simulator
+# Run the simulator
 python main.py
 ```
 
 ### Access the Simulator
 Open your browser to: **http://localhost:5000**
 
-## 🎮 How to Use
+## 🗽 NYC Traffic Data Integration
 
-1. **Start Simulation**: Click the "▶️ Start" button
-2. **Watch Traffic**: See vehicles moving through intersections
-3. **Add Special Vehicle**: Click "🚨 Add Special Vehicle" to test priority override
-4. **Monitor Metrics**: View real-time statistics in the sidebar
-5. **Control Simulation**: Use Start/Stop/Reset buttons as needed
+### Dataset Overview
+- **Source**: Real NYC traffic flow data
+- **Size**: 2,112 time steps × 128 intersections
+- **Time Span**: ~35.2 minutes of actual traffic data
+- **Data Type**: Traffic flow counts (vehicles per time step)
+- **Value Range**: 0 to 1,032 vehicles per time step
 
-## 🏗️ Architecture
+### Data Preprocessing Pipeline
+
+#### 1. **Data Selection**
+```python
+# Select 4 random intersections from 128 available
+selected_intersections = random.sample(range(128), 4)
+# Example: [104, 71, 124, 119]
+```
+
+#### 2. **Time Window Processing**
+```python
+# Extract 2-minute time windows (120 time steps)
+time_window = 2 minutes × 60 steps/minute = 120 time steps
+timeframe_data = data[start:start+120, selected_intersections]
+```
+
+#### 3. **Flow Rate Calculation**
+```python
+# Calculate average flow for each intersection
+avg_flow = np.mean(intersection_flow)
+
+# Distribute across 4 directions with variation
+directions = {
+    'north': avg_flow * (0.25 + random.uniform(-0.2, 0.2)),
+    'south': avg_flow * (0.25 + random.uniform(-0.2, 0.2)),
+    'east': avg_flow * (0.25 + random.uniform(-0.2, 0.2)),
+    'west': avg_flow * (0.25 + random.uniform(-0.2, 0.2))
+}
+```
+
+#### 4. **Vehicle Spawn Rate Conversion**
+```python
+# Convert flow counts to spawn probabilities
+scale_factor = 0.01
+spawn_rate = min(0.5, flow_rate * scale_factor)
+```
+
+### Data Processing Features
+
+- **Real-time Advancement**: Dataset progresses with simulation time
+- **Sliding Windows**: 2-minute windows slide through the dataset
+- **Direction Distribution**: Traffic flow distributed across N/S/E/W with 20% variation
+- **Peak/Min Tracking**: Monitors peak and minimum flow rates
+- **Looping**: Dataset loops when reaching the end
+
+## 🏗️ System Architecture
 
 ### Core Components
+
+#### **Backend (Python)**
+- **`simulation.py`**: Main simulation engine with NYC data integration
+- **`nyc_traffic_data.py`**: NYC traffic data processor and preprocessor
+- **`traffic_light.py`**: Individual intersection controller with 4-phase cycles
+- **`vehicle.py`**: Vehicle classes (normal and special vehicles)
 - **`web_app.py`**: Flask web server with WebSocket support
-- **`simulation.py`**: Traffic simulation engine with 4-phase cycles
-- **`traffic_light.py`**: Individual intersection controller
-- **`vehicle.py`**: Vehicle classes (normal and special)
 
-### Frontend
-- **`templates/index.html`**: Main web interface
-- **`static/css/style.css`**: Visual styling and responsive design
-- **`static/js/traffic-simulator.js`**: Canvas animations and WebSocket client
+#### **Frontend (HTML/CSS/JavaScript)**
+- **`templates/index.html`**: Main web interface with dark theme
+- **`static/css/style.css`**: Responsive styling and visual design
+- **`static/js/traffic-simulator.js`**: Canvas animations and real-time updates
 
-## 🎯 Traffic Light Phases
+### Data Flow
 
+```
+NYC Dataset → Data Processor → Simulation Engine → Web Interface
+     ↓              ↓              ↓              ↓
+Raw Traffic → Flow Rates → Vehicle Spawning → Visual Display
+```
+
+## 🚦 Traffic Light System
+
+### 4-Phase Cycle
 Each intersection cycles through 4 phases:
+
 1. **North-South Green** (20s): Allows northbound and southbound traffic
-2. **East-West Green** (20s): Allows eastbound and westbound traffic
+2. **East-West Green** (20s): Allows eastbound and westbound traffic  
 3. **Left Turns** (15s): Permits left turns from all directions
 4. **All Red** (5s): Clearing phase for intersection safety
 
-## 🚨 Special Vehicle Priority
+### Special Vehicle Priority
+- **Immediate Override**: Normal cycle interrupted when special vehicle detected
+- **Direction-Specific**: Signal switches to green for special vehicle's direction
+- **Auto-Resume**: Normal cycle resumes after special vehicle passes
 
-When a special vehicle is detected:
-- Normal cycle is immediately interrupted
-- Signal switches to green for the special vehicle's direction
-- Override remains active until special vehicle passes through
-- Normal cycle resumes after override ends
+## 🎛️ User Interface
 
-## 🌐 Deployment
+### Main Features
+- **Visual Simulation**: Real-time traffic animation on HTML5 Canvas
+- **Intersection Controllers**: Individual control for each of the 4 intersections
+- **NYC Data Panel**: Live display of traffic data status and metrics
+- **Manual Override**: Manual signal control for each direction
+- **Real-time Metrics**: Live performance monitoring
+
+### Controller Layout
+- **Left Side**: Visual simulation canvas
+- **Right Side**: Intersection controllers with toggle buttons
+- **NYC Data Panel**: Traffic data status and progression metrics
+
+## 📊 Real-time Metrics
+
+### Simulation Metrics
+- **Simulation Time**: Current simulation duration
+- **Vehicles Spawned**: Total vehicles created
+- **Vehicles Passed**: Total vehicles that completed their journey
+- **Throughput**: Vehicles passing per second
+- **Average Wait Time**: Mean waiting time for vehicles
+
+### NYC Data Metrics
+- **Data Time**: Current position in NYC dataset (minutes)
+- **Progress**: Percentage through the dataset
+- **Average Flow**: Mean traffic flow across all intersections
+- **Peak Flow**: Maximum traffic flow observed
+- **Min Flow**: Minimum traffic flow observed
+
+## 🔧 Configuration
+
+### Key Parameters
+```python
+# In simulation.py
+num_intersections = 4
+cycle_length = 60  # seconds
+vehicle_spawn_rate = 0.3  # fallback rate
+special_vehicle_probability = 0.05  # 5%
+simulation_speed = 1.0  # real-time
+use_real_traffic_data = True
+```
+
+### NYC Data Settings
+```python
+# In nyc_traffic_data.py
+time_window_minutes = 2
+time_steps_per_minute = 60
+scale_factor = 0.01  # flow to spawn rate conversion
+variation = 0.2  # 20% direction variation
+```
+
+## 🚀 Deployment
 
 ### Local Development
 ```bash
@@ -96,69 +201,45 @@ EXPOSE 5000
 CMD ["python", "main.py", "--production"]
 ```
 
-### Cloud Platforms
-- **Heroku**: Push to GitHub and deploy
-- **Railway**: Auto-detects and deploys
-- **AWS/GCP/Azure**: Use Docker deployment
+## 📈 Performance Features
 
-## 📊 Performance Metrics
+### Scalability
+- **Responsive Design**: Automatically scales from mobile to desktop
+- **High DPI Support**: Crisp graphics on retina displays
+- **Real-time Updates**: WebSocket communication for live data
+- **Efficient Processing**: Optimized data processing pipeline
 
-- **Simulation Time**: Current simulation duration
-- **Vehicles Passed**: Total vehicles that completed their journey
-- **Throughput**: Vehicles passing per second
-- **Average Wait Time**: Mean waiting time for vehicles
-- **Queue Lengths**: Real-time queue monitoring per intersection
+### Data Efficiency
+- **Selective Loading**: Uses only 4 out of 128 intersections (3.1% of data)
+- **Time Windows**: Processes 2-minute segments for memory efficiency
+- **Real-time Processing**: Dynamic flow rate calculation
+- **Fallback System**: Graceful degradation to synthetic data if needed
 
-## 🎨 Visual Elements
+## 🎯 Use Cases
 
-- **Road Network**: 2x2 grid of intersections with connecting roads
-- **Traffic Lights**: Color-coded signals (red/yellow/green) that scale with screen size
-- **Custom Vehicle Sprites**: Real car and ambulance images with proper directional rotation
-- **Custom Road Textures**: Realistic road graphics with transparent backgrounds
-- **Responsive Design**: Automatically scales from mobile to desktop screens
-- **High DPI Support**: Crisp graphics on retina and high-resolution displays
-- **Special Vehicle Alerts**: Ambulance sprites for emergency vehicles
-- **Real-time Updates**: Live simulation with smooth visual feedback
+- **Traffic Engineering**: Study intersection efficiency with real data
+- **Education**: Learn about traffic management systems
+- **Research**: Test traffic control algorithms with authentic patterns
+- **Demonstration**: Show real-world traffic light behavior
+- **Prototyping**: Develop new traffic management solutions
 
-## 📱 Scalability Features
+## 🔬 Technical Details
 
-- **Responsive Canvas**: Automatically adjusts size based on screen dimensions
-- **Proportional Scaling**: All elements scale together maintaining visual consistency
-- **Mobile Optimization**: Touch-friendly controls and compact layout
-- **High DPI Support**: Sharp graphics on all display types
-- **Window Resize**: Real-time adjustment when browser window is resized
-- **Fallback Graphics**: Graceful degradation if custom images fail to load
+### Data Processing Algorithm
+1. **Load Dataset**: Read 2,112 × 128 traffic flow matrix
+2. **Select Intersections**: Randomly choose 4 intersections
+3. **Extract Windows**: Get 2-minute time windows (120 steps)
+4. **Calculate Flows**: Compute average, peak, and min flow rates
+5. **Distribute Directions**: Split flow across N/S/E/W with variation
+6. **Convert Rates**: Transform flow counts to spawn probabilities
+7. **Advance Time**: Progress through dataset with simulation time
 
-## 🖼️ Image Processing
-
-The simulator includes automatic image processing to remove white backgrounds:
-
-```bash
-# Process images to remove white backgrounds
-python process_images.py
-```
-
-This script:
-- Removes white/light backgrounds from vehicle and road images
-- Makes backgrounds transparent for seamless integration
-- Processes Car.png, Ambulance.png, and Road.png
-- Saves processed images to `static/images/`
-
-## 🔧 Configuration
-
-Key parameters can be adjusted in `web_app.py`:
-- **Number of Intersections**: Default 4 (2x2 grid)
-- **Cycle Length**: Total signal cycle duration (default: 60s)
-- **Vehicle Spawn Rate**: Vehicles per second per intersection
-- **Special Vehicle Probability**: Chance of emergency vehicle
-- **Simulation Speed**: Real-time multiplier
-
-## 📱 Browser Support
-
-- **Desktop**: Full feature set with large canvas
-- **Tablet**: Optimized layout with touch controls
-- **Mobile**: Compact view with essential features
-- **Requirements**: Modern browser with HTML5 Canvas and WebSocket support
+### Simulation Engine
+- **Discrete Time Steps**: 1-second simulation intervals
+- **Vehicle Spawning**: Probability-based spawning using real data
+- **Signal Control**: 4-phase cycle with special vehicle override
+- **Queue Management**: Realistic vehicle queuing and movement
+- **Metrics Collection**: Real-time performance monitoring
 
 ## 🐛 Troubleshooting
 
@@ -173,30 +254,12 @@ Key parameters can be adjusted in `web_app.py`:
 python main.py --debug
 ```
 
-## 🎯 Use Cases
-
-- **Traffic Engineering**: Study intersection efficiency
-- **Education**: Learn about traffic management systems
-- **Research**: Test traffic control algorithms
-- **Demonstration**: Show traffic light behavior
-- **Prototyping**: Develop new traffic management solutions
-
-## 📈 Future Enhancements
-
-- Machine learning-based traffic prediction
-- Dynamic signal timing optimization
-- Integration with real traffic data
-- Advanced vehicle routing algorithms
-- Multi-modal transportation support
-- 3D visualization
-- VR/AR support
-
 ## 📄 License
 
 This project is part of a Smart India Hackathon submission for intelligent traffic management systems.
 
 ---
 
-**Ready to simulate traffic! 🚦✨**
+**Ready to simulate real NYC traffic! 🗽🚦✨**
 
-Open your browser to **http://localhost:5000** and start the simulation!
+Open your browser to **http://localhost:5000** and experience authentic NYC traffic patterns!

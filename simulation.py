@@ -9,17 +9,21 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass
 from vehicle import Vehicle, SpecialVehicle, Lane, VehicleType
 from traffic_light import TrafficLight, SignalPhase
+from nyc_traffic_data import NYCTrafficDataProcessor
+from signal_controller import CentralizedSignalController, SignalState, ControlMode
 
 
 @dataclass
 class SimulationConfig:
     """Configuration for the simulation."""
-    num_intersections: int = 6
+    num_intersections: int = 4  # Updated to 4 intersections
     cycle_length: int = 60
-    vehicle_spawn_rate: float = 0.3  # vehicles per second per intersection
+    vehicle_spawn_rate: float = 0.3  # vehicles per second per intersection (fallback)
     special_vehicle_probability: float = 0.05  # 5% chance of special vehicle
     simulation_speed: float = 1.0  # 1.0 = real time, 2.0 = 2x speed
     max_vehicles_per_intersection: int = 50
+    use_real_traffic_data: bool = True  # Use NYC traffic data
+    traffic_data_file: str = "/Users/user/Documents/Hackathon/SIH/TrafficSignalAI/data/V-128.csv"
 
 
 class TrafficSimulation:
@@ -46,7 +50,22 @@ class TrafficSimulation:
         self.simulation_thread: Optional[threading.Thread] = None
         self.lock = threading.Lock()
         
+        # NYC Traffic Data Integration
+        self.traffic_data_processor = None
+        if self.config.use_real_traffic_data:
+            try:
+                self.traffic_data_processor = NYCTrafficDataProcessor(self.config.traffic_data_file)
+                print("✅ NYC Traffic Data integrated successfully")
+            except Exception as e:
+                print(f"⚠️ Failed to load NYC traffic data: {e}")
+                print("🔄 Falling back to synthetic data")
+                self.config.use_real_traffic_data = False
+        
         self._initialize_intersections()
+        
+        # Initialize centralized signal controller
+        self.signal_controller = CentralizedSignalController(self)
+        print("✅ Centralized Signal Controller initialized")
     
     def _initialize_intersections(self):
         """Initialize the traffic light intersections."""
@@ -67,33 +86,54 @@ class TrafficSimulation:
             return f"vehicle_{self.vehicle_counter}"
     
     def _spawn_vehicles(self, current_time: float):
-        """Spawn new vehicles at intersections."""
-        for intersection in self.intersections:
-            # Check if we should spawn a vehicle at this intersection
-            if random.random() < self.config.vehicle_spawn_rate:
-                # Check if intersection has capacity
-                if intersection.get_total_queue_length() < self.config.max_vehicles_per_intersection:
-                    # Choose random lane
-                    lane = random.choice(list(Lane))
-                    
-                    # Determine if this should be a special vehicle
-                    is_special = random.random() < self.config.special_vehicle_probability
-                    
-                    if is_special:
-                        vehicle = SpecialVehicle(
-                            vehicle_id=self._generate_vehicle_id(is_special=True),
-                            lane=lane
-                        )
-                        self.total_special_vehicles_spawned += 1
-                    else:
-                        vehicle = Vehicle(
-                            vehicle_id=self._generate_vehicle_id(),
-                            lane=lane,
-                            speed=random.uniform(0.8, 1.2)  # Random speed variation
-                        )
-                    
-                    intersection.add_vehicle(vehicle)
-                    self.total_vehicles_spawned += 1
+        """Spawn new vehicles at intersections using real traffic data."""
+        for i, intersection in enumerate(self.intersections):
+            intersection_id = f"intersection_{i+1}"
+            
+            # Get spawn rates from real traffic data or use fallback
+            if self.config.use_real_traffic_data and self.traffic_data_processor:
+                spawn_rates = self.traffic_data_processor.get_vehicle_spawn_rates(intersection_id)
+            else:
+                # Fallback to uniform spawn rates
+                spawn_rates = {
+                    'north': self.config.vehicle_spawn_rate / 4,
+                    'south': self.config.vehicle_spawn_rate / 4,
+                    'east': self.config.vehicle_spawn_rate / 4,
+                    'west': self.config.vehicle_spawn_rate / 4
+                }
+            
+            # Spawn vehicles for each direction
+            for direction, spawn_rate in spawn_rates.items():
+                if random.random() < spawn_rate:
+                    # Check if intersection has capacity
+                    if intersection.get_total_queue_length() < self.config.max_vehicles_per_intersection:
+                        # Map direction to Lane enum
+                        lane_map = {
+                            'north': Lane.NORTH,
+                            'south': Lane.SOUTH,
+                            'east': Lane.EAST,
+                            'west': Lane.WEST
+                        }
+                        lane = lane_map[direction]
+                        
+                        # Determine if this should be a special vehicle
+                        is_special = random.random() < self.config.special_vehicle_probability
+                        
+                        if is_special:
+                            vehicle = SpecialVehicle(
+                                vehicle_id=self._generate_vehicle_id(is_special=True),
+                                lane=lane
+                            )
+                            self.total_special_vehicles_spawned += 1
+                        else:
+                            vehicle = Vehicle(
+                                vehicle_id=self._generate_vehicle_id(),
+                                lane=lane,
+                                speed=random.uniform(0.8, 1.2)  # Random speed variation
+                            )
+                        
+                        intersection.add_vehicle(vehicle)
+                        self.total_vehicles_spawned += 1
     
     def _update_simulation(self, current_time: float):
         """Update the simulation state."""
@@ -102,14 +142,28 @@ class TrafficSimulation:
             if self.last_update_time is not None:
                 time_delta = current_time - self.last_update_time
                 self.simulation_time += time_delta * self.config.simulation_speed
+                
+                # Advance traffic data time (every second of simulation time)
+                if self.config.use_real_traffic_data and self.traffic_data_processor:
+                    # Advance by 1 time step for every second of simulation
+                    steps_to_advance = int(time_delta * self.config.simulation_speed)
+                    if steps_to_advance > 0:
+                        self.traffic_data_processor.advance_time(steps_to_advance)
             
             # Spawn new vehicles
             self._spawn_vehicles(current_time)
             
+            # Update signal controller
+            self.signal_controller.update_automatic_signals(current_time)
+            self.signal_controller.check_override_timeouts(current_time)
+            
+            # Verify signal integrity (safety check)
+            self.signal_controller.verify_signal_integrity()
+            
             # Update all intersections
             for intersection in self.intersections:
                 intersection.update_phase(current_time)
-                intersection._apply_direction_overrides()
+                # Note: _apply_direction_overrides() is now handled by the signal controller
                 intersection.update_vehicles(current_time)
             
             # Update metrics
@@ -227,7 +281,7 @@ class TrafficSimulation:
                 for intersection in self.intersections
             )
             
-            return {
+            metrics = {
                 'simulation_time': self.simulation_time,
                 'total_vehicles_spawned': self.total_vehicles_spawned,
                 'total_vehicles_passed': self.total_vehicles_passed,
@@ -242,6 +296,26 @@ class TrafficSimulation:
                 ),
                 'is_running': self.is_running
             }
+            
+            # Add traffic data information if available
+            if self.config.use_real_traffic_data and self.traffic_data_processor:
+                time_info = self.traffic_data_processor.get_current_time_info()
+                traffic_summary = self.traffic_data_processor.get_traffic_summary()
+                
+                metrics.update({
+                    'traffic_data': {
+                        'using_real_data': True,
+                        'current_time_minutes': time_info['current_time_minutes'],
+                        'progress_percentage': time_info['progress_percentage'],
+                        'average_flow': traffic_summary['average_flow'],
+                        'peak_flow': traffic_summary['peak_flow'],
+                        'min_flow': traffic_summary['min_flow']
+                    }
+                })
+            else:
+                metrics['traffic_data'] = {'using_real_data': False}
+            
+            return metrics
     
     def add_special_vehicle(self, intersection_id: str, lane: Lane) -> bool:
         """Manually add a special vehicle to a specific intersection and lane."""
@@ -259,21 +333,43 @@ class TrafficSimulation:
     
     def set_manual_override(self, intersection_id: str, direction: str, signal: str) -> bool:
         """Set manual override for a specific signal direction at an intersection."""
-        with self.lock:
-            for intersection in self.intersections:
-                if intersection.intersection_id == intersection_id:
-                    intersection.set_manual_override(direction, signal)
-                    return True
-        return False
+        try:
+            signal_state = SignalState(signal)
+            return self.signal_controller.set_signal_state(
+                intersection_id, direction, signal_state, ControlMode.MANUAL
+            )
+        except ValueError:
+            print(f"❌ Invalid signal state: {signal}")
+            return False
     
     def set_auto_mode(self, intersection_id: str, direction: str) -> bool:
         """Set auto mode for a specific signal direction at an intersection."""
-        with self.lock:
-            for intersection in self.intersections:
-                if intersection.intersection_id == intersection_id:
-                    intersection.set_auto_mode(direction)
-                    return True
-        return False
+        return self.signal_controller.set_automatic_mode(intersection_id, direction)
+    
+    def get_signal_control_summary(self) -> Dict:
+        """Get signal control summary."""
+        return self.signal_controller.get_control_summary()
+    
+    def get_all_signal_states(self) -> Dict:
+        """Get all signal states."""
+        return self.signal_controller.get_all_signal_states()
+    
+    def emergency_override(self, intersection_id: str, direction: str, duration: float = 30.0) -> bool:
+        """Set emergency override for a specific direction."""
+        return self.signal_controller.emergency_override(intersection_id, direction, duration)
+    
+    def set_ai_control(self, intersection_id: str, direction: str, signal: str, duration: Optional[float] = None) -> bool:
+        """Set AI control for a specific signal."""
+        try:
+            signal_state = SignalState(signal)
+            return self.signal_controller.set_ai_control(intersection_id, direction, signal_state, duration)
+        except ValueError:
+            print(f"❌ Invalid signal state: {signal}")
+            return False
+    
+    def verify_signal_integrity(self) -> bool:
+        """Verify that all manual signals are properly maintained."""
+        return self.signal_controller.verify_signal_integrity()
     
     def __del__(self):
         """Cleanup when simulation is destroyed."""

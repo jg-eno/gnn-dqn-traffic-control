@@ -127,8 +127,8 @@ class WebTrafficSimulator:
                     'timestamp': time.time()
                 })
         
-        @self.socketio.on('manual_override')
-        def handle_manual_override(data):
+        @self.socketio.on('set_signal_override')
+        def handle_signal_override(data):
             """Handle manual signal override."""
             try:
                 intersection_id = data.get('intersection_id')
@@ -137,14 +137,17 @@ class WebTrafficSimulator:
                 
                 if intersection_id and direction and signal:
                     # Set manual override for the specific signal direction
-                    self.simulation.set_manual_override(intersection_id, direction, signal)
+                    success = self.simulation.set_manual_override(intersection_id, direction, signal)
                     emit('override_set', {
                         'intersection_id': intersection_id,
                         'direction': direction,
-                        'signal': signal
+                        'signal': signal,
+                        'success': success
                     })
+                    print(f"🎛️ Signal override: {intersection_id} {direction} -> {signal} ({'✅' if success else '❌'})")
             except Exception as e:
-                print(f"Error setting manual override: {e}")
+                print(f"❌ Error setting manual override: {e}")
+                emit('error', {'message': f'Error setting signal override: {e}'})
         
         @self.socketio.on('set_auto_mode')
         def handle_set_auto_mode(data):
@@ -154,14 +157,74 @@ class WebTrafficSimulator:
                 direction = data.get('direction')
                 
                 if intersection_id and direction:
-                    # Set auto mode for the specific signal direction
-                    self.simulation.set_auto_mode(intersection_id, direction)
+                    success = self.simulation.set_auto_mode(intersection_id, direction)
                     emit('auto_mode_set', {
                         'intersection_id': intersection_id,
-                        'direction': direction
+                        'direction': direction,
+                        'success': success
                     })
+                    print(f"🔄 Auto mode set: {intersection_id} {direction} ({'✅' if success else '❌'})")
             except Exception as e:
-                print(f"Error setting auto mode: {e}")
+                print(f"❌ Error setting auto mode: {e}")
+                emit('error', {'message': f'Error setting auto mode: {e}'})
+        
+        @self.socketio.on('emergency_override')
+        def handle_emergency_override(data):
+            """Handle emergency override."""
+            try:
+                intersection_id = data.get('intersection_id')
+                direction = data.get('direction')
+                duration = data.get('duration', 30.0)
+                
+                if intersection_id and direction:
+                    success = self.simulation.emergency_override(intersection_id, direction, duration)
+                    emit('emergency_override_set', {
+                        'intersection_id': intersection_id,
+                        'direction': direction,
+                        'duration': duration,
+                        'success': success
+                    })
+                    print(f"🚨 Emergency override: {intersection_id} {direction} for {duration}s ({'✅' if success else '❌'})")
+            except Exception as e:
+                print(f"❌ Error setting emergency override: {e}")
+                emit('error', {'message': f'Error setting emergency override: {e}'})
+        
+        @self.socketio.on('set_ai_control')
+        def handle_ai_control(data):
+            """Handle AI control."""
+            try:
+                intersection_id = data.get('intersection_id')
+                direction = data.get('direction')
+                signal = data.get('signal')
+                duration = data.get('duration')
+                
+                if intersection_id and direction and signal:
+                    success = self.simulation.set_ai_control(intersection_id, direction, signal, duration)
+                    emit('ai_control_set', {
+                        'intersection_id': intersection_id,
+                        'direction': direction,
+                        'signal': signal,
+                        'duration': duration,
+                        'success': success
+                    })
+                    print(f"🤖 AI control: {intersection_id} {direction} -> {signal} ({'✅' if success else '❌'})")
+            except Exception as e:
+                print(f"❌ Error setting AI control: {e}")
+                emit('error', {'message': f'Error setting AI control: {e}'})
+        
+        @self.socketio.on('get_signal_states')
+        def handle_get_signal_states():
+            """Get all signal states."""
+            try:
+                signal_states = self.simulation.get_all_signal_states()
+                control_summary = self.simulation.get_signal_control_summary()
+                emit('signal_states', {
+                    'signal_states': signal_states,
+                    'control_summary': control_summary
+                })
+            except Exception as e:
+                print(f"❌ Error getting signal states: {e}")
+                emit('error', {'message': f'Error getting signal states: {e}'})
     
     def _broadcast_updates(self):
         """Broadcast simulation updates to all connected clients."""
