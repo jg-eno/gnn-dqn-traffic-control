@@ -126,6 +126,42 @@ class WebTrafficSimulator:
                     'metrics': metrics,
                     'timestamp': time.time()
                 })
+        
+        @self.socketio.on('manual_override')
+        def handle_manual_override(data):
+            """Handle manual signal override."""
+            try:
+                intersection_id = data.get('intersection_id')
+                direction = data.get('direction')
+                signal = data.get('signal')
+                
+                if intersection_id and direction and signal:
+                    # Set manual override for the specific signal direction
+                    self.simulation.set_manual_override(intersection_id, direction, signal)
+                    emit('override_set', {
+                        'intersection_id': intersection_id,
+                        'direction': direction,
+                        'signal': signal
+                    })
+            except Exception as e:
+                print(f"Error setting manual override: {e}")
+        
+        @self.socketio.on('set_auto_mode')
+        def handle_set_auto_mode(data):
+            """Handle setting auto mode."""
+            try:
+                intersection_id = data.get('intersection_id')
+                direction = data.get('direction')
+                
+                if intersection_id and direction:
+                    # Set auto mode for the specific signal direction
+                    self.simulation.set_auto_mode(intersection_id, direction)
+                    emit('auto_mode_set', {
+                        'intersection_id': intersection_id,
+                        'direction': direction
+                    })
+            except Exception as e:
+                print(f"Error setting auto mode: {e}")
     
     def _broadcast_updates(self):
         """Broadcast simulation updates to all connected clients."""

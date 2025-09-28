@@ -32,6 +32,7 @@ class VisualTrafficSimulator {
         this.setupEventListeners();
         this.setupSocketEvents();
         this.setupResizeHandler();
+        this.setupIntersectionToggles();
         this.draw();
     }
     
@@ -42,12 +43,16 @@ class VisualTrafficSimulator {
     updateCanvasSize() {
         const container = this.canvas.parentElement;
         const containerWidth = container.clientWidth - 40; // Account for padding
-        const containerHeight = Math.min(800, window.innerHeight - 200);
+        const containerHeight = Math.min(window.innerHeight - 200, 800); // Much more height, account for controllers
         
-        // Calculate scale based on container width
-        this.scale = Math.min(containerWidth / this.baseWidth, containerHeight / this.baseHeight, 1);
+        // Use more of the available space, especially vertically
+        const targetWidth = Math.min(containerWidth, 1200);
+        const targetHeight = Math.min(containerHeight, 800);
         
-        // Set canvas size
+        // Calculate scale to fit the available space, prioritizing vertical scaling
+        this.scale = Math.min(targetWidth / this.baseWidth, targetHeight / this.baseHeight);
+        
+        // Set canvas size to use more space
         this.canvas.width = this.baseWidth * this.scale;
         this.canvas.height = this.baseHeight * this.scale;
         
@@ -228,45 +233,210 @@ class VisualTrafficSimulator {
         this.intersections = data.intersections || [];
         this.metrics = data.metrics || {};
         
-        // Update UI metrics
-        this.updateMetrics();
-        this.updateIntersectionStatus();
+        // Update signal controllers
+        this.updateSignalControllers();
         
         // Update vehicles based on intersection data
         this.updateVehicles();
     }
     
-    updateMetrics() {
-        document.getElementById('simTime').textContent = `${this.metrics.simulation_time?.toFixed(1) || 0}s`;
-        document.getElementById('vehiclesPassed').textContent = this.metrics.total_vehicles_passed || 0;
-        document.getElementById('throughput').textContent = `${(this.metrics.throughput || 0).toFixed(2)} veh/s`;
-        document.getElementById('avgWaitTime').textContent = `${(this.metrics.average_wait_time || 0).toFixed(1)}s`;
+    setupIntersectionToggles() {
+        // Set up toggle button event listeners
+        const toggleButtons = document.querySelectorAll('.toggle-btn');
+        toggleButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const intersectionId = e.target.getAttribute('data-intersection');
+                this.switchToIntersection(intersectionId);
+            });
+        });
+        
+        // Initialize with intersection 1
+        this.currentIntersection = 'intersection_1';
+        this.updateActiveController();
     }
     
-    updateIntersectionStatus() {
-        const container = document.getElementById('intersectionList');
-        container.innerHTML = '';
-        
-        this.intersections.forEach(intersection => {
-            if (!intersection) return;
-            
-            const item = document.createElement('div');
-            item.className = `intersection-item ${intersection.is_override_active ? 'override' : ''}`;
-            
-            const phase = intersection.current_phase.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            const queues = Object.entries(intersection.queue_lengths)
-                .filter(([_, count]) => count > 0)
-                .map(([lane, count]) => `${lane}: ${count}`)
-                .join(', ');
-            
-            item.innerHTML = `
-                <div class="intersection-title">${intersection.id.replace('_', ' ').toUpperCase()}</div>
-                <div class="intersection-phase">${phase} ${intersection.is_override_active ? '🚨 OVERRIDE' : ''}</div>
-                <div class="intersection-queues">${queues || 'No queues'}</div>
-            `;
-            
-            container.appendChild(item);
+    switchToIntersection(intersectionId) {
+        // Update active button
+        document.querySelectorAll('.toggle-btn').forEach(btn => {
+            btn.classList.remove('active');
         });
+        document.querySelector(`[data-intersection="${intersectionId}"]`).classList.add('active');
+        
+        // Update current intersection
+        this.currentIntersection = intersectionId;
+        this.updateActiveController();
+    }
+    
+    updateActiveController() {
+        const activeController = document.getElementById('active-controller');
+        if (!activeController) return;
+        
+        // Find the intersection data
+        const intersection = this.intersections.find(i => i.id === this.currentIntersection);
+        if (!intersection) {
+            activeController.innerHTML = '<p>No intersection data available</p>';
+            return;
+        }
+        
+        // Create and display the controller
+        const controller = this.createSignalController(intersection);
+        activeController.innerHTML = '';
+        activeController.appendChild(controller);
+    }
+    
+    updateSignalControllers() {
+        // Update the active controller if it exists
+        if (this.currentIntersection) {
+            this.updateActiveController();
+        }
+    }
+    
+    createSignalController(intersection) {
+        const intersectionName = intersection.id.replace('_', ' ').toUpperCase();
+        
+        // Create a container for all 4 signal controllers for this intersection
+        const intersectionContainer = document.createElement('div');
+        intersectionContainer.className = 'intersection-controller-group';
+        intersectionContainer.id = `intersection-group-${intersection.id}`;
+        intersectionContainer.setAttribute('data-intersection', intersection.id);
+        
+        // Create header for the intersection
+        const header = document.createElement('div');
+        header.className = 'intersection-header';
+        header.innerHTML = `
+            <h4>${intersectionName}</h4>
+            <div class="intersection-metrics">
+                <span class="metric-label">Total Vehicles: </span>
+                <span class="metric-value">${Object.values(intersection.queue_lengths).reduce((sum, count) => sum + count, 0)}</span>
+            </div>
+        `;
+        intersectionContainer.appendChild(header);
+        
+        // Create individual controllers for each direction
+        const directions = [
+            { name: 'North', key: 'north', icon: '⬆️' },
+            { name: 'South', key: 'south', icon: '⬇️' },
+            { name: 'East', key: 'east', icon: '➡️' },
+            { name: 'West', key: 'west', icon: '⬅️' }
+        ];
+        
+        // Create a container for signal controllers
+        const controllersContainer = document.createElement('div');
+        controllersContainer.className = 'signal-controllers-container';
+        
+        directions.forEach(direction => {
+            const controller = this.createIndividualSignalController(intersection, direction);
+            controllersContainer.appendChild(controller);
+        });
+        
+        intersectionContainer.appendChild(controllersContainer);
+        
+        return intersectionContainer;
+    }
+    
+    createIndividualSignalController(intersection, direction) {
+        const controller = document.createElement('div');
+        controller.className = 'signal-controller';
+        controller.id = `controller-${intersection.id}-${direction.key}`;
+        
+        const currentSignal = intersection.signal_colors[direction.key];
+        const vehicleCount = intersection.queue_lengths[direction.key] || 0;
+        const avgSpeed = this.calculateAverageSpeed(intersection);
+        
+        controller.innerHTML = `
+            <div class="signal-header">
+                <span class="signal-direction">${direction.icon} ${direction.name}</span>
+                <span class="signal-status ${currentSignal}">●</span>
+            </div>
+            
+            <div class="controller-metrics">
+                <div class="metric-item">
+                    <span class="metric-label">Vehicles</span>
+                    <span class="metric-value" id="vehicles-${intersection.id}-${direction.key}">${vehicleCount}</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label">Speed</span>
+                    <span class="metric-value" id="speed-${intersection.id}-${direction.key}">${avgSpeed.toFixed(1)} km/h</span>
+                </div>
+            </div>
+            
+            <div class="controller-controls">
+                <button class="controller-btn btn-red" data-intersection="${intersection.id}" data-direction="${direction.key}" data-signal="red">🔴</button>
+                <button class="controller-btn btn-yellow" data-intersection="${intersection.id}" data-direction="${direction.key}" data-signal="yellow">🟡</button>
+                <button class="controller-btn btn-green" data-intersection="${intersection.id}" data-direction="${direction.key}" data-signal="green">🟢</button>
+                <button class="controller-btn btn-auto ${intersection.is_override_active ? '' : 'active'}" data-intersection="${intersection.id}" data-direction="${direction.key}" data-signal="auto">⚙️</button>
+            </div>
+            
+            <div class="${intersection.is_override_active ? 'override-mode' : 'auto-mode'}" id="mode-${intersection.id}-${direction.key}">
+                ${intersection.is_override_active ? 'MANUAL' : 'AUTO'}
+            </div>
+        `;
+        
+        // Add event listeners for manual control
+        this.addControllerEventListeners(controller, intersection.id, direction.key);
+        
+        return controller;
+    }
+    
+    addControllerEventListeners(controller, intersectionId, direction) {
+        const buttons = controller.querySelectorAll('.controller-btn');
+        const modeIndicator = controller.querySelector(`#mode-${intersectionId}-${direction}`);
+        
+        buttons.forEach(button => {
+            button.addEventListener('click', () => {
+                const signal = button.dataset.signal;
+                
+                if (signal === 'auto') {
+                    // Switch to auto mode
+                    this.switchToAutoMode(intersectionId, direction);
+                } else {
+                    // Manual override
+                    this.manualSignalOverride(intersectionId, direction, signal);
+                }
+                
+                // Update button states
+                buttons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+            });
+        });
+    }
+    
+    switchToAutoMode(intersectionId, direction) {
+        const modeIndicator = document.querySelector(`#mode-${intersectionId}-${direction}`);
+        modeIndicator.textContent = 'AUTO';
+        modeIndicator.className = 'auto-mode';
+        
+        // Send auto mode command to backend
+        this.socket.emit('set_auto_mode', { 
+            intersection_id: intersectionId,
+            direction: direction 
+        });
+    }
+    
+    manualSignalOverride(intersectionId, direction, signal) {
+        const modeIndicator = document.querySelector(`#mode-${intersectionId}-${direction}`);
+        modeIndicator.textContent = 'MANUAL';
+        modeIndicator.className = 'override-mode';
+        
+        // Send manual override command to backend
+        this.socket.emit('manual_override', { 
+            intersection_id: intersectionId, 
+            direction: direction,
+            signal: signal 
+        });
+    }
+    
+    calculateAverageSpeed(intersection) {
+        // Calculate average speed based on queue lengths and signal states
+        const totalVehicles = Object.values(intersection.queue_lengths).reduce((sum, count) => sum + count, 0);
+        
+        if (totalVehicles === 0) return 0;
+        
+        // Base speed calculation (simplified)
+        const baseSpeed = 30; // km/h
+        const queueFactor = Math.max(0.1, 1 - (totalVehicles / 20)); // Reduce speed with more vehicles
+        
+        return baseSpeed * queueFactor;
     }
     
     updateVehicles() {
@@ -283,9 +453,20 @@ class VisualTrafficSimulator {
             // Add vehicles for each lane with queues
             Object.entries(intersection.queue_lengths).forEach(([lane, count]) => {
                 for (let i = 0; i < count; i++) {
+                    let vehicleX = this.getVehicleX(pos.x, lane, i);
+                    let vehicleY = this.getVehicleY(pos.y, lane, i);
+                    
+                    // Ensure vehicle is on a road
+                    if (!this.isVehicleOnRoad(vehicleX, vehicleY)) {
+                        // If not on road, move to nearest road position
+                        const roadPos = this.getNearestRoadPosition(vehicleX, vehicleY, lane);
+                        vehicleX = roadPos.x;
+                        vehicleY = roadPos.y;
+                    }
+                    
                     this.vehicles.push({
-                        x: this.getVehicleX(pos.x, lane, i),
-                        y: this.getVehicleY(pos.y, lane, i),
+                        x: vehicleX,
+                        y: vehicleY,
                         lane: lane,
                         intersection: intersection.id,
                         isSpecial: intersection.special_vehicles.some(sv => sv.lane === lane),
@@ -296,27 +477,118 @@ class VisualTrafficSimulator {
         });
     }
     
+    isVehicleOnRoad(x, y) {
+        const roadWidth = 56 * this.scale;
+        const roadHalfWidth = roadWidth / 2;
+        const scaledWidth = this.baseWidth * this.scale;
+        const scaledHeight = this.baseHeight * this.scale;
+        
+        // Check if vehicle is on horizontal roads (y positions)
+        const horizontalRoadY1 = scaledHeight * 0.25;
+        const horizontalRoadY2 = scaledHeight * 0.75;
+        
+        if ((Math.abs(y - horizontalRoadY1) <= roadHalfWidth || Math.abs(y - horizontalRoadY2) <= roadHalfWidth) &&
+            x >= 50 * this.scale && x <= scaledWidth - 50 * this.scale) {
+            return true;
+        }
+        
+        // Check if vehicle is on vertical roads (x positions)
+        const verticalRoadX1 = scaledWidth * 0.25;
+        const verticalRoadX2 = scaledWidth * 0.75;
+        
+        if ((Math.abs(x - verticalRoadX1) <= roadHalfWidth || Math.abs(x - verticalRoadX2) <= roadHalfWidth) &&
+            y >= 50 * this.scale && y <= scaledHeight - 50 * this.scale) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    getNearestRoadPosition(x, y, lane) {
+        const roadWidth = 56 * this.scale;
+        const roadHalfWidth = roadWidth / 2;
+        const scaledWidth = this.baseWidth * this.scale;
+        const scaledHeight = this.baseHeight * this.scale;
+        const leftLaneOffset = 14 * this.scale;
+        
+        // Determine which road the vehicle should be on based on lane
+        switch (lane) {
+            case 'north':
+            case 'south':
+                // Vertical roads
+                const verticalRoadX1 = scaledWidth * 0.25;
+                const verticalRoadX2 = scaledWidth * 0.75;
+                const nearestVerticalX = Math.abs(x - verticalRoadX1) < Math.abs(x - verticalRoadX2) ? verticalRoadX1 : verticalRoadX2;
+                return {
+                    x: nearestVerticalX + (lane === 'south' ? leftLaneOffset : -leftLaneOffset),
+                    y: Math.max(50 * this.scale + roadHalfWidth, Math.min(y, scaledHeight - 50 * this.scale - roadHalfWidth))
+                };
+            case 'east':
+            case 'west':
+                // Horizontal roads
+                const horizontalRoadY1 = scaledHeight * 0.25;
+                const horizontalRoadY2 = scaledHeight * 0.75;
+                const nearestHorizontalY = Math.abs(y - horizontalRoadY1) < Math.abs(y - horizontalRoadY2) ? horizontalRoadY1 : horizontalRoadY2;
+                return {
+                    x: Math.max(50 * this.scale + roadHalfWidth, Math.min(x, scaledWidth - 50 * this.scale - roadHalfWidth)),
+                    y: nearestHorizontalY + (lane === 'west' ? leftLaneOffset : -leftLaneOffset)
+                };
+            default:
+                return { x: x, y: y };
+        }
+    }
+    
     getVehicleX(intersectionX, lane, index) {
         const offset = index * 50 * this.scale;
         const roadOffset = 60 * this.scale;
+        const leftLaneOffset = 14 * this.scale; // Offset to align with left lane
+        const roadWidth = 56 * this.scale;
+        const roadHalfWidth = roadWidth / 2;
+        
+        let x;
         switch (lane) {
-            case 'north': return intersectionX;
-            case 'south': return intersectionX;
-            case 'east': return intersectionX + roadOffset + offset;
-            case 'west': return intersectionX - roadOffset - offset;
-            default: return intersectionX;
+            case 'north': 
+                x = intersectionX - leftLaneOffset;
+                // Constrain to road boundaries
+                return Math.max(50 * this.scale + roadHalfWidth, Math.min(x, this.baseWidth * this.scale - 50 * this.scale - roadHalfWidth));
+            case 'south': 
+                x = intersectionX + leftLaneOffset;
+                return Math.max(50 * this.scale + roadHalfWidth, Math.min(x, this.baseWidth * this.scale - 50 * this.scale - roadHalfWidth));
+            case 'east': 
+                x = intersectionX + roadOffset + offset;
+                return Math.max(50 * this.scale + roadHalfWidth, Math.min(x, this.baseWidth * this.scale - 50 * this.scale - roadHalfWidth));
+            case 'west': 
+                x = intersectionX - roadOffset - offset;
+                return Math.max(50 * this.scale + roadHalfWidth, Math.min(x, this.baseWidth * this.scale - 50 * this.scale - roadHalfWidth));
+            default: 
+                return Math.max(50 * this.scale + roadHalfWidth, Math.min(intersectionX, this.baseWidth * this.scale - 50 * this.scale - roadHalfWidth));
         }
     }
     
     getVehicleY(intersectionY, lane, index) {
         const offset = index * 50 * this.scale;
         const roadOffset = 60 * this.scale;
+        const leftLaneOffset = 14 * this.scale; // Offset to align with left lane
+        const roadWidth = 56 * this.scale;
+        const roadHalfWidth = roadWidth / 2;
+        
+        let y;
         switch (lane) {
-            case 'north': return intersectionY - roadOffset - offset;
-            case 'south': return intersectionY + roadOffset + offset;
-            case 'east': return intersectionY;
-            case 'west': return intersectionY;
-            default: return intersectionY;
+            case 'north': 
+                y = intersectionY - roadOffset - offset;
+                // Constrain to road boundaries
+                return Math.max(50 * this.scale + roadHalfWidth, Math.min(y, this.baseHeight * this.scale - 50 * this.scale - roadHalfWidth));
+            case 'south': 
+                y = intersectionY + roadOffset + offset;
+                return Math.max(50 * this.scale + roadHalfWidth, Math.min(y, this.baseHeight * this.scale - 50 * this.scale - roadHalfWidth));
+            case 'east': 
+                y = intersectionY - leftLaneOffset;
+                return Math.max(50 * this.scale + roadHalfWidth, Math.min(y, this.baseHeight * this.scale - 50 * this.scale - roadHalfWidth));
+            case 'west': 
+                y = intersectionY + leftLaneOffset;
+                return Math.max(50 * this.scale + roadHalfWidth, Math.min(y, this.baseHeight * this.scale - 50 * this.scale - roadHalfWidth));
+            default: 
+                return Math.max(50 * this.scale + roadHalfWidth, Math.min(intersectionY, this.baseHeight * this.scale - 50 * this.scale - roadHalfWidth));
         }
     }
     
@@ -344,68 +616,103 @@ class VisualTrafficSimulator {
     drawRoads() {
         const scaledWidth = this.baseWidth * this.scale;
         const scaledHeight = this.baseHeight * this.scale;
+        const roadWidth = 56 * this.scale;
         
-        if (this.images.road) {
-            // Use custom road image if available
-            const roadWidth = 350 * this.scale;
-            const roadHeight = 56 * this.scale;
+        // Draw professional roads with black asphalt and yellow markings
+        this.drawProfessionalRoad(scaledWidth * 0.25, 50 * this.scale, scaledHeight - 100 * this.scale, roadWidth, 'vertical');
+        this.drawProfessionalRoad(scaledWidth * 0.75, 50 * this.scale, scaledHeight - 100 * this.scale, roadWidth, 'vertical');
+        this.drawProfessionalRoad(50 * this.scale, scaledHeight * 0.25, scaledWidth - 100 * this.scale, roadWidth, 'horizontal');
+        this.drawProfessionalRoad(50 * this.scale, scaledHeight * 0.75, scaledWidth - 100 * this.scale, roadWidth, 'horizontal');
+    }
+    
+    drawProfessionalRoad(x, y, length, width, direction) {
+        this.ctx.save();
+        
+        if (direction === 'vertical') {
+            // Draw black asphalt road
+            this.ctx.fillStyle = '#2c2c2c';
+            this.ctx.fillRect(x - width/2, y, width, length);
             
-            // Horizontal roads
-            for (let y of [scaledHeight * 0.25, scaledHeight * 0.75]) {
-                this.ctx.drawImage(this.images.road, 50 * this.scale, y - roadHeight/2, scaledWidth - 100 * this.scale, roadHeight);
-            }
+            // Draw road edges (darker lines)
+            this.ctx.strokeStyle = '#1a1a1a';
+            this.ctx.lineWidth = 2 * this.scale;
+            this.ctx.beginPath();
+            this.ctx.moveTo(x - width/2, y);
+            this.ctx.lineTo(x - width/2, y + length);
+            this.ctx.moveTo(x + width/2, y);
+            this.ctx.lineTo(x + width/2, y + length);
+            this.ctx.stroke();
             
-            // Vertical roads
-            for (let x of [scaledWidth * 0.25, scaledWidth * 0.75]) {
-                this.ctx.save();
-                this.ctx.translate(x, scaledHeight * 0.5);
-                this.ctx.rotate(Math.PI / 2);
-                this.ctx.drawImage(this.images.road, -scaledHeight/2, -roadHeight/2, scaledHeight, roadHeight);
-                this.ctx.restore();
-            }
-        } else {
-            // Fallback to drawn roads
-            this.ctx.strokeStyle = '#34495e';
-            this.ctx.lineWidth = 56 * this.scale;
-            this.ctx.lineCap = 'round';
+            // Draw yellow center line
+            this.ctx.strokeStyle = '#ffd700';
+            this.ctx.lineWidth = 4 * this.scale;
+            this.ctx.setLineDash([20 * this.scale, 15 * this.scale]);
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, y);
+            this.ctx.lineTo(x, y + length);
+            this.ctx.stroke();
             
-            // Horizontal roads
-            for (let y of [scaledHeight * 0.25, scaledHeight * 0.75]) {
-                this.ctx.beginPath();
-                this.ctx.moveTo(50 * this.scale, y);
-                this.ctx.lineTo(scaledWidth - 50 * this.scale, y);
-                this.ctx.stroke();
-            }
+            // Draw white lane dividers
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 2 * this.scale;
+            this.ctx.setLineDash([15 * this.scale, 10 * this.scale]);
             
-            // Vertical roads
-            for (let x of [scaledWidth * 0.25, scaledWidth * 0.75]) {
-                this.ctx.beginPath();
-                this.ctx.moveTo(x, 50 * this.scale);
-                this.ctx.lineTo(x, scaledHeight - 50 * this.scale);
-                this.ctx.stroke();
-            }
+            // Left lane divider
+            this.ctx.beginPath();
+            this.ctx.moveTo(x - width/4, y);
+            this.ctx.lineTo(x - width/4, y + length);
+            this.ctx.stroke();
             
-            // Road markings
-            this.ctx.strokeStyle = '#ecf0f1';
-            this.ctx.lineWidth = 8 * this.scale;
-            this.ctx.setLineDash([25 * this.scale, 25 * this.scale]);
+            // Right lane divider
+            this.ctx.beginPath();
+            this.ctx.moveTo(x + width/4, y);
+            this.ctx.lineTo(x + width/4, y + length);
+            this.ctx.stroke();
             
-            for (let y of [scaledHeight * 0.25, scaledHeight * 0.75]) {
-                this.ctx.beginPath();
-                this.ctx.moveTo(50 * this.scale, y);
-                this.ctx.lineTo(scaledWidth - 50 * this.scale, y);
-                this.ctx.stroke();
-            }
+        } else { // horizontal
+            // Draw black asphalt road
+            this.ctx.fillStyle = '#2c2c2c';
+            this.ctx.fillRect(x, y - width/2, length, width);
             
-            for (let x of [scaledWidth * 0.25, scaledWidth * 0.75]) {
-                this.ctx.beginPath();
-                this.ctx.moveTo(x, 50 * this.scale);
-                this.ctx.lineTo(x, scaledHeight - 50 * this.scale);
-                this.ctx.stroke();
-            }
+            // Draw road edges (darker lines)
+            this.ctx.strokeStyle = '#1a1a1a';
+            this.ctx.lineWidth = 2 * this.scale;
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, y - width/2);
+            this.ctx.lineTo(x + length, y - width/2);
+            this.ctx.moveTo(x, y + width/2);
+            this.ctx.lineTo(x + length, y + width/2);
+            this.ctx.stroke();
             
-            this.ctx.setLineDash([]);
+            // Draw yellow center line
+            this.ctx.strokeStyle = '#ffd700';
+            this.ctx.lineWidth = 4 * this.scale;
+            this.ctx.setLineDash([20 * this.scale, 15 * this.scale]);
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, y);
+            this.ctx.lineTo(x + length, y);
+            this.ctx.stroke();
+            
+            // Draw white lane dividers
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 2 * this.scale;
+            this.ctx.setLineDash([15 * this.scale, 10 * this.scale]);
+            
+            // Top lane divider
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, y - width/4);
+            this.ctx.lineTo(x + length, y - width/4);
+            this.ctx.stroke();
+            
+            // Bottom lane divider
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, y + width/4);
+            this.ctx.lineTo(x + length, y + width/4);
+            this.ctx.stroke();
         }
+        
+        this.ctx.setLineDash([]);
+        this.ctx.restore();
     }
     
     drawIntersections() {
@@ -448,32 +755,164 @@ class VisualTrafficSimulator {
             }
             this.ctx.rotate(rotation);
             
-            if (vehicle.isSpecial && this.images.ambulance) {
-                // Draw ambulance for special vehicles
-                this.ctx.drawImage(this.images.ambulance, -vehicleSize/2, -vehicleSize/2, vehicleSize, vehicleSize);
-            } else if (this.images.car) {
-                // Draw regular car
-                this.ctx.drawImage(this.images.car, -vehicleSize/2, -vehicleSize/2, vehicleSize, vehicleSize);
-            } else {
-                // Fallback to drawn vehicles
-                this.ctx.fillStyle = vehicle.color;
-                this.ctx.fillRect(-vehicleSize/2, -vehicleSize/2, vehicleSize, vehicleSize * 0.6);
-                
-                // Vehicle highlight
-                this.ctx.fillStyle = '#ecf0f1';
-                this.ctx.fillRect(-vehicleSize/2 + 2, -vehicleSize/2 + 2, vehicleSize - 4, 4);
-                
-                // Special vehicle indicator
-                if (vehicle.isSpecial) {
-                    this.ctx.fillStyle = '#f39c12';
-                    this.ctx.beginPath();
-                    this.ctx.arc(0, -vehicleSize/2 - 5, 3 * this.scale, 0, 2 * Math.PI);
-                    this.ctx.fill();
-                }
-            }
+            // Draw custom vehicle graphics
+            this.drawCustomVehicle(vehicle, vehicleSize);
             
             this.ctx.restore();
         });
+    }
+    
+    drawCustomVehicle(vehicle, size) {
+        const width = size;
+        const height = size * 0.6;
+        
+        if (vehicle.isSpecial) {
+            // Draw ambulance with custom graphics
+            this.drawAmbulance(width, height);
+        } else {
+            // Draw regular car with custom graphics
+            this.drawCar(width, height);
+        }
+    }
+    
+    drawCar(width, height) {
+        // Car body - rounded rectangle with slightly wider front/back
+        const bodyWidth = width;
+        const bodyHeight = height;
+        const cornerRadius = 6 * this.scale;
+        
+        // Main car body - solid color (blue)
+        this.ctx.fillStyle = '#3498db';
+        this.ctx.beginPath();
+        this.ctx.roundRect(-bodyWidth/2, -bodyHeight/2, bodyWidth, bodyHeight, cornerRadius);
+        this.ctx.fill();
+        
+        // Car body border
+        this.ctx.strokeStyle = '#2c3e50';
+        this.ctx.lineWidth = 1 * this.scale;
+        this.ctx.stroke();
+        
+        // Front windshield - dark gray/black rectangle
+        const windshieldWidth = bodyWidth * 0.4;
+        const windshieldHeight = bodyHeight * 0.25;
+        this.ctx.fillStyle = '#2c3e50';
+        this.ctx.beginPath();
+        this.ctx.roundRect(-windshieldWidth/2, -bodyHeight/2 + 2 * this.scale, windshieldWidth, windshieldHeight, 2 * this.scale);
+        this.ctx.fill();
+        
+        // Rear window - dark gray/black rectangle
+        this.ctx.fillStyle = '#2c3e50';
+        this.ctx.beginPath();
+        this.ctx.roundRect(-windshieldWidth/2, bodyHeight/2 - windshieldHeight - 2 * this.scale, windshieldWidth, windshieldHeight, 2 * this.scale);
+        this.ctx.fill();
+        
+        // Side door lines - thin black lines
+        this.ctx.strokeStyle = '#2c3e50';
+        this.ctx.lineWidth = 1 * this.scale;
+        this.ctx.beginPath();
+        this.ctx.moveTo(-bodyWidth/2 + 3 * this.scale, -bodyHeight/2 + 4 * this.scale);
+        this.ctx.lineTo(-bodyWidth/2 + 3 * this.scale, bodyHeight/2 - 4 * this.scale);
+        this.ctx.moveTo(bodyWidth/2 - 3 * this.scale, -bodyHeight/2 + 4 * this.scale);
+        this.ctx.lineTo(bodyWidth/2 - 3 * this.scale, bodyHeight/2 - 4 * this.scale);
+        this.ctx.stroke();
+        
+        // Front lights - small orange/red indicators
+        this.ctx.fillStyle = '#f39c12';
+        this.ctx.beginPath();
+        this.ctx.arc(-bodyWidth/2 + 2 * this.scale, -bodyHeight/2 + 3 * this.scale, 1.5 * this.scale, 0, 2 * Math.PI);
+        this.ctx.fill();
+        this.ctx.beginPath();
+        this.ctx.arc(bodyWidth/2 - 2 * this.scale, -bodyHeight/2 + 3 * this.scale, 1.5 * this.scale, 0, 2 * Math.PI);
+        this.ctx.fill();
+        
+        // Rear lights - small red taillights
+        this.ctx.fillStyle = '#e74c3c';
+        this.ctx.beginPath();
+        this.ctx.arc(-bodyWidth/2 + 2 * this.scale, bodyHeight/2 - 3 * this.scale, 1.5 * this.scale, 0, 2 * Math.PI);
+        this.ctx.fill();
+        this.ctx.beginPath();
+        this.ctx.arc(bodyWidth/2 - 2 * this.scale, bodyHeight/2 - 3 * this.scale, 1.5 * this.scale, 0, 2 * Math.PI);
+        this.ctx.fill();
+    }
+    
+    drawAmbulance(width, height) {
+        // Ambulance body - rounded rectangle with slightly wider front/back
+        const bodyWidth = width;
+        const bodyHeight = height;
+        const cornerRadius = 6 * this.scale;
+        
+        // Main ambulance body - solid red color
+        this.ctx.fillStyle = '#e74c3c';
+        this.ctx.beginPath();
+        this.ctx.roundRect(-bodyWidth/2, -bodyHeight/2, bodyWidth, bodyHeight, cornerRadius);
+        this.ctx.fill();
+        
+        // Ambulance body border
+        this.ctx.strokeStyle = '#c0392b';
+        this.ctx.lineWidth = 1 * this.scale;
+        this.ctx.stroke();
+        
+        // White cross on side - prominent medical symbol
+        const crossSize = Math.min(bodyWidth, bodyHeight) * 0.4;
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.beginPath();
+        this.ctx.roundRect(-crossSize/2, -crossSize/2, crossSize, crossSize, 3 * this.scale);
+        this.ctx.fill();
+        
+        // Red cross in the center
+        this.ctx.fillStyle = '#e74c3c';
+        this.ctx.beginPath();
+        this.ctx.roundRect(-crossSize/6, -crossSize/2, crossSize/3, crossSize, 1 * this.scale);
+        this.ctx.fill();
+        this.ctx.beginPath();
+        this.ctx.roundRect(-crossSize/2, -crossSize/6, crossSize, crossSize/3, 1 * this.scale);
+        this.ctx.fill();
+        
+        // Front windshield - dark gray/black rectangle
+        const windshieldWidth = bodyWidth * 0.4;
+        const windshieldHeight = bodyHeight * 0.25;
+        this.ctx.fillStyle = '#2c3e50';
+        this.ctx.beginPath();
+        this.ctx.roundRect(-windshieldWidth/2, -bodyHeight/2 + 2 * this.scale, windshieldWidth, windshieldHeight, 2 * this.scale);
+        this.ctx.fill();
+        
+        // Rear window - dark gray/black rectangle
+        this.ctx.fillStyle = '#2c3e50';
+        this.ctx.beginPath();
+        this.ctx.roundRect(-windshieldWidth/2, bodyHeight/2 - windshieldHeight - 2 * this.scale, windshieldWidth, windshieldHeight, 2 * this.scale);
+        this.ctx.fill();
+        
+        // Side door lines - thin black lines
+        this.ctx.strokeStyle = '#2c3e50';
+        this.ctx.lineWidth = 1 * this.scale;
+        this.ctx.beginPath();
+        this.ctx.moveTo(-bodyWidth/2 + 3 * this.scale, -bodyHeight/2 + 4 * this.scale);
+        this.ctx.lineTo(-bodyWidth/2 + 3 * this.scale, bodyHeight/2 - 4 * this.scale);
+        this.ctx.moveTo(bodyWidth/2 - 3 * this.scale, -bodyHeight/2 + 4 * this.scale);
+        this.ctx.lineTo(bodyWidth/2 - 3 * this.scale, bodyHeight/2 - 4 * this.scale);
+        this.ctx.stroke();
+        
+        // Emergency lights (flashing effect)
+        const time = Date.now() / 200;
+        const flash = Math.sin(time) > 0;
+        if (flash) {
+            this.ctx.fillStyle = '#f1c40f';
+            this.ctx.beginPath();
+            this.ctx.arc(-bodyWidth/2 + 2 * this.scale, -bodyHeight/2 + 3 * this.scale, 2 * this.scale, 0, 2 * Math.PI);
+            this.ctx.fill();
+            this.ctx.beginPath();
+            this.ctx.arc(bodyWidth/2 - 2 * this.scale, -bodyHeight/2 + 3 * this.scale, 2 * this.scale, 0, 2 * Math.PI);
+            this.ctx.fill();
+        }
+        
+        // Rear lights - small red taillights
+        this.ctx.fillStyle = '#e74c3c';
+        this.ctx.beginPath();
+        this.ctx.arc(-bodyWidth/2 + 2 * this.scale, bodyHeight/2 - 3 * this.scale, 1.5 * this.scale, 0, 2 * Math.PI);
+        this.ctx.fill();
+        this.ctx.beginPath();
+        this.ctx.arc(bodyWidth/2 - 2 * this.scale, bodyHeight/2 - 3 * this.scale, 1.5 * this.scale, 0, 2 * Math.PI);
+        this.ctx.fill();
     }
     
     drawTrafficLights() {
@@ -599,3 +1038,4 @@ class VisualTrafficSimulator {
 document.addEventListener('DOMContentLoaded', () => {
     new VisualTrafficSimulator();
 });
+

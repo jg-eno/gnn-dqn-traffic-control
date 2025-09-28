@@ -8,9 +8,9 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     min-height: 100vh;
-    color: #333;
+    color: #e0e0e0;
 }
 
 .container {
@@ -52,12 +52,13 @@ header p {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    color: #e0e0e0;
 }
 
 .btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.4);
 }
 
 .btn:disabled {
@@ -86,25 +87,118 @@ header p {
     color: white;
 }
 
-.simulation-container {
+/* Main Container - Left-Right Layout */
+.main-container {
     display: flex;
     gap: 20px;
-    background: white;
+    background: #1a1a1a;
     border-radius: 15px;
     padding: 20px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    min-height: 600px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    min-height: 800px;
+    max-height: 1000px;
+    border: 1px solid #333;
 }
 
-#trafficCanvas {
-    border: 2px solid #ddd;
+/* Left Side - Simulation */
+.simulation-section {
+    flex: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #2d2d2d;
     border-radius: 10px;
-    background: #2c3e50;
-    box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
+    padding: 20px;
+    min-height: 700px;
+    max-height: 900px;
+    border: 1px solid #444;
+}
+
+/* Right Side - Controllers */
+.controllers-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 350px;
+    max-width: 400px;
+}
+
+/* Intersection Toggle Buttons */
+.intersection-toggles {
+    background: #2a2a2a;
+    border-radius: 10px;
+    padding: 15px;
+    border: 2px solid #4a9eff;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.intersection-toggles h3 {
+    color: #e0e0e0;
+    margin: 0 0 10px 0;
+    font-size: 1.1em;
+    text-align: center;
+}
+
+.toggle-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.toggle-btn {
+    padding: 12px 16px;
+    border: 2px solid #555;
+    border-radius: 6px;
+    background: #3a3a3a;
+    color: #e0e0e0;
+    font-size: 0.9em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    width: 100%;
+}
+
+.toggle-btn:hover {
+    background: #4a4a4a;
+    border-color: #777;
+    transform: translateY(-2px);
+}
+
+.toggle-btn.active {
+    background: #4a9eff;
+    color: white;
+    border-color: #3a8bdf;
+    box-shadow: 0 4px 8px rgba(74, 158, 255, 0.3);
+}
+
+/* Active Controller Container */
+.active-controller {
+    background: #2a2a2a;
+    border-radius: 10px;
+    padding: 15px;
+    border: 2px solid #4a9eff;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    overflow-y: auto;
+    flex: 1;
+    max-height: 500px;
+}
+
+
+#trafficCanvas {
+    border: 2px solid #555;
+    border-radius: 10px;
+    background: #1e1e1e;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.6);
     max-width: 100%;
     height: auto;
     flex: 1;
     min-width: 800px;
+    min-height: 600px;
+    max-height: 800px;
+    display: block;
+    margin: 0 auto;
 }
 
 .sidebar {
@@ -114,38 +208,199 @@ header p {
     gap: 20px;
 }
 
-.metrics-panel, .intersection-status {
-    background: #f8f9fa;
+.intersection-status, .signal-controllers {
+    background: #2a2a2a;
     border-radius: 10px;
     padding: 20px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
 }
 
-.metrics-panel h3, .intersection-status h3 {
+.intersection-status h3, .signal-controllers h3 {
     margin-bottom: 15px;
-    color: #2c3e50;
-    border-bottom: 2px solid #3498db;
+    color: #e0e0e0;
+    border-bottom: 2px solid #4a9eff;
     padding-bottom: 8px;
 }
 
-.metric {
+/* Signal Controller Styles */
+.signal-controllers {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+/* Signal Controllers Around Simulation */
+.signal-controllers-around {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* Intersection Controller Group - Vertical Layout */
+.intersection-controller-group {
+    background: #2a2a2a;
+    border-radius: 10px;
+    padding: 15px;
+    border: 2px solid #4a9eff;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+
+.intersection-header {
+    text-align: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #ecf0f1;
+}
+
+.intersection-header h4 {
+    color: #e0e0e0;
+    margin: 0 0 8px 0;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.intersection-metrics {
+    color: #b0b0b0;
+    font-size: 0.9em;
+}
+
+.intersection-metrics .metric-value {
+    color: #e0e0e0;
+    font-weight: bold;
+}
+
+/* Signal Controllers Container - Vertical Layout */
+.signal-controllers-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    flex: 1;
+}
+
+/* Individual Signal Controllers - Vertical Layout */
+.signal-controller {
+    background: #3a3a3a;
+    border-radius: 6px;
+    padding: 10px;
+    border-left: 3px solid #4a9eff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    min-height: 100px;
+}
+
+
+.signal-header {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     margin-bottom: 10px;
-    padding: 8px 0;
-    border-bottom: 1px solid #ecf0f1;
 }
 
-.metric-label {
-    font-weight: 600;
-    color: #34495e;
+.signal-direction {
+    color: #e0e0e0;
+    font-size: 0.9em;
+    font-weight: bold;
 }
 
-.metric-value {
-    font-weight: 700;
-    color: #e74c3c;
-    font-family: 'Courier New', monospace;
+.signal-status {
+    font-size: 1.2em;
 }
+
+.signal-controller h4 {
+    color: #2c3e50;
+    margin: 0 0 12px 0;
+    font-size: 1em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.controller-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.metric-item {
+    background: #4a4a4a;
+    border-radius: 4px;
+    padding: 6px;
+    text-align: center;
+}
+
+.metric-item .metric-label {
+    color: #b0b0b0;
+    font-size: 0.7em;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.metric-item .metric-value {
+    color: #e0e0e0;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+
+.controller-controls {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.controller-btn {
+    flex: 1;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.7em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+
+.controller-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.btn-red { background: #e74c3c; color: white; }
+.btn-yellow { background: #f39c12; color: white; }
+.btn-green { background: #27ae60; color: white; }
+.btn-auto { background: #4a9eff; color: white; }
+
+.controller-btn.active {
+    box-shadow: 0 0 10px rgba(74, 158, 255, 0.5);
+    transform: scale(1.05);
+}
+
+.override-mode {
+    background: #e67e22;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.7em;
+    font-weight: bold;
+    text-align: center;
+    margin-top: 6px;
+}
+
+.auto-mode {
+    background: #27ae60;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.7em;
+    font-weight: bold;
+    text-align: center;
+    margin-top: 6px;
+}
+
 
 .intersection-item {
     background: white;
@@ -248,41 +503,115 @@ header p {
 }
 
 /* Responsive Design */
-@media (max-width: 1400px) {
-    .simulation-container {
+@media (max-width: 1200px) {
+    .main-container {
         flex-direction: column;
+        gap: 15px;
     }
     
-    .sidebar {
-        width: 100%;
-        flex-direction: row;
-        gap: 20px;
-    }
-    
-    .metrics-panel, .intersection-status {
-        flex: 1;
-    }
-    
-    #trafficCanvas {
-        width: 100%;
-        height: 600px;
+    .controllers-section {
         min-width: auto;
+        max-width: none;
+    }
+    
+    .toggle-buttons {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    .toggle-btn {
+        flex: 1;
+        min-width: 120px;
     }
 }
 
-@media (max-width: 1000px) {
-    .sidebar {
-        flex-direction: column;
+@media (max-width: 768px) {
+    .main-container {
+        padding: 15px;
     }
     
-    #trafficCanvas {
-        height: 500px;
+    .simulation-section {
+        padding: 15px;
+        min-height: 400px;
+    }
+    
+    .controllers-section {
+        gap: 15px;
+    }
+    
+    .intersection-toggles {
+        padding: 12px;
+    }
+    
+    .active-controller {
+        padding: 12px;
+        max-height: 300px;
+    }
+    
+    .toggle-buttons {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .toggle-btn {
+        padding: 10px 12px;
+        font-size: 0.8em;
+        width: 100%;
+    }
+    
+    .signal-controllers-container {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .signal-controller {
+        min-height: 80px;
+        padding: 8px;
+    }
+    
+    .controller-metrics {
+        gap: 4px;
+        margin-bottom: 8px;
+    }
+    
+    .metric-item {
+        padding: 4px;
+    }
+    
+    .metric-item .metric-label {
+        font-size: 0.6em;
+    }
+    
+    .metric-item .metric-value {
+        font-size: 0.7em;
+    }
+    
+    .controller-controls {
+        gap: 3px;
+        margin-bottom: 6px;
+    }
+    
+    .controller-btn {
+        padding: 4px 6px;
+        font-size: 0.6em;
     }
 }
 
 @media (max-width: 768px) {
     #trafficCanvas {
-        height: 400px;
+        min-width: 600px;
+        min-height: 500px;
+        max-height: 700px;
+    }
+    
+    .simulation-section {
+        min-height: 600px;
+        max-height: 800px;
+    }
+    
+    .main-container {
+        min-height: 700px;
+        max-height: 900px;
     }
 }
 

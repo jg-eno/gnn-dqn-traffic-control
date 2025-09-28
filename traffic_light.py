@@ -48,6 +48,17 @@ class TrafficLight:
         # Metrics
         self.total_vehicles_passed = 0
         self.total_wait_time = 0.0
+        
+        # Signal colors for each direction (for manual overrides)
+        self.signal_colors = {
+            'north': 'red',
+            'south': 'red', 
+            'east': 'red',
+            'west': 'red'
+        }
+        
+        # Direction overrides for manual control
+        self.direction_overrides = {}
     
     def add_vehicle(self, vehicle: Vehicle):
         """Add a vehicle to the appropriate queue."""
@@ -114,6 +125,23 @@ class TrafficLight:
             current_duration = self.phase_durations[self.current_phase]
             if self.phase_elapsed >= current_duration:
                 self._advance_to_next_phase(current_time)
+        
+        # Update signal colors based on current phase
+        self._update_signal_colors()
+    
+    def _update_signal_colors(self):
+        """Update signal colors based on current phase."""
+        if self.current_phase == SignalPhase.ALL_RED:
+            self.signal_colors = {'north': 'red', 'south': 'red', 'east': 'red', 'west': 'red'}
+        elif self.current_phase == SignalPhase.NORTH_SOUTH_GREEN:
+            self.signal_colors = {'north': 'green', 'south': 'green', 'east': 'red', 'west': 'red'}
+        elif self.current_phase == SignalPhase.EAST_WEST_GREEN:
+            self.signal_colors = {'north': 'red', 'south': 'red', 'east': 'green', 'west': 'green'}
+        elif self.current_phase == SignalPhase.LEFT_TURNS:
+            self.signal_colors = {'north': 'green', 'south': 'green', 'east': 'green', 'west': 'green'}
+        
+        # Apply any manual overrides
+        self._apply_direction_overrides()
     
     def _advance_to_next_phase(self, current_time: float):
         """Advance to the next phase in the cycle."""
@@ -191,6 +219,20 @@ class TrafficLight:
     
     def get_signal_color(self, lane: Lane) -> str:
         """Get the current signal color for a specific lane."""
+        # Convert lane to direction string
+        direction_map = {
+            Lane.NORTH: 'north',
+            Lane.SOUTH: 'south',
+            Lane.EAST: 'east',
+            Lane.WEST: 'west'
+        }
+        direction = direction_map.get(lane, 'north')
+        
+        # Check for manual override first
+        if hasattr(self, 'direction_overrides') and direction in self.direction_overrides:
+            return self.direction_overrides[direction]['signal']
+        
+        # Default phase-based logic
         if self.current_phase == SignalPhase.ALL_RED:
             return "red"
         
@@ -207,6 +249,38 @@ class TrafficLight:
         """Get the progress of the current phase (0.0 to 1.0)."""
         current_duration = self.phase_durations[self.current_phase]
         return min(self.phase_elapsed / current_duration, 1.0)
+    
+    def set_manual_override(self, direction: str, signal: str):
+        """Set manual override for a specific signal direction."""
+        self.direction_overrides[direction] = {
+            'signal': signal,
+            'timestamp': time.time()
+        }
+        
+        # Update the signal color for this direction
+        if signal == "red":
+            self.signal_colors[direction] = "red"
+        elif signal == "yellow":
+            self.signal_colors[direction] = "yellow"
+        elif signal == "green":
+            self.signal_colors[direction] = "green"
+    
+    def set_auto_mode(self, direction: str):
+        """Set a specific signal direction back to automatic mode."""
+        if direction in self.direction_overrides:
+            del self.direction_overrides[direction]
+            # The signal will be updated by the normal phase cycling
+    
+    def _apply_direction_overrides(self):
+        """Apply individual direction overrides to signal colors."""
+        for direction, override_data in self.direction_overrides.items():
+            signal = override_data['signal']
+            if signal == "red":
+                self.signal_colors[direction] = "red"
+            elif signal == "yellow":
+                self.signal_colors[direction] = "yellow"
+            elif signal == "green":
+                self.signal_colors[direction] = "green"
     
     def __repr__(self):
         return f"TrafficLight(id={self.intersection_id}, phase={self.current_phase.value}, override={self.is_override_active})"

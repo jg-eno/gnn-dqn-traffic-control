@@ -11,7 +11,7 @@
     <div class="container">
         <header>
             <h1>🚦 Visual Traffic Light Simulator</h1>
-            <p>Real-time simulation of 6 traffic light intersections with special vehicle priority</p>
+            <p>Real-time simulation of 4 traffic light intersections with special vehicle priority</p>
         </header>
 
         <div class="controls">
@@ -21,36 +21,32 @@
             <button id="addSpecialBtn" class="btn btn-special">🚨 Add Special Vehicle</button>
         </div>
 
-        <div class="simulation-container">
-            <canvas id="trafficCanvas"></canvas>
+        <div class="main-container">
+            <!-- Left Side - Simulation -->
+            <div class="simulation-section">
+                <canvas id="trafficCanvas"></canvas>
+            </div>
             
-            <div class="sidebar">
-                <div class="metrics-panel">
-                    <h3>📊 Live Metrics</h3>
-                    <div class="metric">
-                        <span class="metric-label">Simulation Time:</span>
-                        <span id="simTime" class="metric-value">0.0s</span>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-label">Vehicles Passed:</span>
-                        <span id="vehiclesPassed" class="metric-value">0</span>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-label">Throughput:</span>
-                        <span id="throughput" class="metric-value">0.00 veh/s</span>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-label">Avg Wait Time:</span>
-                        <span id="avgWaitTime" class="metric-value">0.0s</span>
+            <!-- Right Side - Intersection Controllers -->
+            <div class="controllers-section">
+                <!-- Intersection Toggle Buttons -->
+                <div class="intersection-toggles">
+                    <h3>🎛️ Intersection Controllers</h3>
+                    <div class="toggle-buttons">
+                        <button class="toggle-btn active" data-intersection="intersection_1">Intersection 1</button>
+                        <button class="toggle-btn" data-intersection="intersection_2">Intersection 2</button>
+                        <button class="toggle-btn" data-intersection="intersection_3">Intersection 3</button>
+                        <button class="toggle-btn" data-intersection="intersection_4">Intersection 4</button>
                     </div>
                 </div>
-
-                <div class="intersection-status">
-                    <h3>🚦 Intersection Status</h3>
-                    <div id="intersectionList"></div>
+                
+                <!-- Active Intersection Controller -->
+                <div class="active-controller" id="active-controller">
+                    <!-- Controller content will be dynamically loaded here -->
                 </div>
             </div>
         </div>
+
 
         <div class="special-vehicle-modal" id="specialModal" style="display: none;">
             <div class="modal-content">

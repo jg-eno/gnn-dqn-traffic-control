@@ -109,6 +109,7 @@ class TrafficSimulation:
             # Update all intersections
             for intersection in self.intersections:
                 intersection.update_phase(current_time)
+                intersection._apply_direction_overrides()
                 intersection.update_vehicles(current_time)
             
             # Update metrics
@@ -253,6 +254,24 @@ class TrafficSimulation:
                     )
                     intersection.add_vehicle(vehicle)
                     self.total_special_vehicles_spawned += 1
+                    return True
+        return False
+    
+    def set_manual_override(self, intersection_id: str, direction: str, signal: str) -> bool:
+        """Set manual override for a specific signal direction at an intersection."""
+        with self.lock:
+            for intersection in self.intersections:
+                if intersection.intersection_id == intersection_id:
+                    intersection.set_manual_override(direction, signal)
+                    return True
+        return False
+    
+    def set_auto_mode(self, intersection_id: str, direction: str) -> bool:
+        """Set auto mode for a specific signal direction at an intersection."""
+        with self.lock:
+            for intersection in self.intersections:
+                if intersection.intersection_id == intersection_id:
+                    intersection.set_auto_mode(direction)
                     return True
         return False
     
