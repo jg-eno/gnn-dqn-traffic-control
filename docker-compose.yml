@@ -1,0 +1,22 @@
+services:
+  traffic-simulator:
+    build: .
+    container_name: gnn-dqn-traffic-control
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - PYTHONPATH=/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - traffic-net
+
+networks:
+  traffic-net:
+    driver: bridge

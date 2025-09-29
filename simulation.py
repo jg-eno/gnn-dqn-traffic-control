@@ -23,7 +23,7 @@ class SimulationConfig:
     simulation_speed: float = 1.0  # 1.0 = real time, 2.0 = 2x speed
     max_vehicles_per_intersection: int = 50
     use_real_traffic_data: bool = True  # Use NYC traffic data
-    traffic_data_file: str = "/Users/user/Documents/Hackathon/SIH/TrafficSignalAI/data/V-128.csv"
+    traffic_data_file: str = "V-128.csv"
 
 
 class TrafficSimulation:

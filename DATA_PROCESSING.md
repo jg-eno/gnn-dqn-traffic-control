@@ -267,7 +267,7 @@ total_intersections = 128
 ```python
 # Simulation configuration
 use_real_traffic_data = True
-traffic_data_file = "/path/to/V-128.csv"
+traffic_data_file = "V-128.csv"
 simulation_speed = 1.0  # real-time
 ```
 

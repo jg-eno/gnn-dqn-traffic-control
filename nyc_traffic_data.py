@@ -13,7 +13,7 @@ class NYCTrafficDataProcessor:
     
     def __init__(self, data_file_path: str):
         self.data_file_path = data_file_path
-        self.traffic_data = None
+        self.traffic_data = "V-128.csv"
         self.selected_intersections = []
         self.current_time_index = 0
         self.time_window_minutes = 2  # 2-minute time window
@@ -186,7 +186,7 @@ def test_nyc_traffic_data():
     print("=" * 50)
     
     # Initialize the processor
-    data_file = "/Users/user/Documents/Hackathon/SIH/TrafficSignalAI/data/V-128.csv"
+    data_file = "V-128.csv"
     processor = NYCTrafficDataProcessor(data_file)
     
     # Test getting traffic flow data

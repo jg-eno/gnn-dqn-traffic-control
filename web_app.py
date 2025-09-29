@@ -250,7 +250,7 @@ class WebTrafficSimulator:
         print(f"Starting Traffic Light Simulator Web App...")
         print(f"Open your browser to: http://{host}:{port}")
         
-        self.socketio.run(self.app, host=host, port=port, debug=debug)
+        self.socketio.run(self.app, host=host, port=port, debug=debug, allow_unsafe_werkzeug=True)
 
 
 def main():
